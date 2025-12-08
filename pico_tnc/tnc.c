@@ -300,7 +300,7 @@ void tnc_emulate(void)
       current_time.min = frombcd(Ram[clock_address+1]);
       current_time.hour = frombcd(Ram[clock_address+2]);
       current_time.day = frombcd(Ram[clock_address+3]);
-      current_time.month = frombcd(Ram[clock_address+4]) + 1;
+      current_time.month = frombcd(Ram[clock_address+4]);
       current_time.year = frombcd(Ram[clock_address+5]) + 2000;
       rtc_set_datetime(&current_time);
       // printf("RTC Update %d:%d:%d:%d:%d\n",current_time.year,current_time.month,current_time.day,
@@ -317,7 +317,7 @@ void tnc_emulate(void)
       Ram[clock_address+2] = tobcd(x);
       x= current_time.day;
       Ram[clock_address+3] = tobcd(x);
-      x= current_time.month - 1;
+      x= current_time.month;
       Ram[clock_address+4] = tobcd(x);
       // Don't need to update years as they match
       // x= current_time.year;
@@ -926,6 +926,9 @@ unsigned int GetNextBbsMsgNo(void)
 bool consolePeek(void)
 {
   bool retval = false;
+
+  // If tnc is not ready to accept more characters return false 
+  if((siob.registers[5] & 0x02) == 0) return false;
 
   if(tty[0].con_mode)
   {
