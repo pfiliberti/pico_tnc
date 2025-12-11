@@ -26,9 +26,26 @@
 #include "send.h"
 #include "ax25.h"
 
-//#include "wave_table.h"
 #include "wave_table.h"
 
+// added for opentnc hardware support
+#ifdef OPEN_TNC_PTT_OUT
+static const int pwm_pins[] = {
+    OPEN_TNC_PWM,	// port 0
+    8,  // port 1
+    6,  // port 2
+};
+
+static const int ptt_pins[] = {
+    OPEN_TNC_PTT_OUT, // port 0
+    9,  // port 1
+    7,  // port 2
+};
+
+static int openTncLED;
+
+#define LED_PIN OPEN_TNC_PTT_LED
+#else
 static const int pwm_pins[] = {
     10, // port 0
     8,  // port 1
@@ -42,6 +59,7 @@ static const int ptt_pins[] = {
 };
 
 #define LED_PIN PICO_DEFAULT_LED_PIN
+#endif
 
 #define ISR_PIN 19
 
@@ -72,6 +90,9 @@ static void __isr dma_handler(void)
 #endif
             } else {
                 gpio_put(tp->ptt_pin, 0); // PTT off
+#ifdef OPEN_TNC_PTT_LED
+				gpio_put(openTncLED,0);
+#endif                
                 //pwm_set_chan_level(tp->pwm_slice, PWM_CHAN_A, 0); // set pwm level 0
                 tp->busy = false;
                 //printf("(%u) dma_handler: queue is empty, port = %d, data_chan = %d, ints = %08x\n", tnc_time(), tp->port, tp->data_chan, int_status);
@@ -87,6 +108,9 @@ static void send_start(tnc_t *tp)
 {
     if (!tp->busy) {
         gpio_put(tp->ptt_pin, 1); // PTT on
+#ifdef OPEN_TNC_PTT_LED
+		gpio_put(openTncLED,1);
+#endif
         tp->busy = true;
         //printf("restart dma, ctrl = %08x, port = %d\n", dma_hw->ch[tp->data_chan].ctrl_trig, tp->port);
         dma_channel_set_read_addr(tp->data_chan, NULL, true); // trigger NULL interrupt
@@ -210,6 +234,14 @@ void send_init(void)
     PIO pio = pio0;
     // load pio_dac program
     uint offset = pio_add_program(pio, &pio_dac_program);
+
+//	there's only one of these for all the instances
+#ifdef OPEN_TNC_PTT_LED
+	openTncLED = OPEN_TNC_PTT_LED;
+	gpio_init(openTncLED);
+	gpio_set_dir(openTncLED, true); // output
+	gpio_put(openTncLED, 0);
+#endif
 
     // initialize tnc[]
     for (int i = 0; i < PORT_N; i++) {

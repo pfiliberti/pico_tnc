@@ -13,6 +13,29 @@
 
 #include "sio.h"
 
+// Added to support opentnc hardware layout (mpvano)
+// NOTE make sure this file (tnc.h) is included in send.c and receive.c
+//	send.c and receive.c will use presence of the following definitions only
+//	that way a simple command line -D OPEN_TNC_GPIO wil enable them in all files
+#define OPEN_TNC_GPIO	1
+#ifdef OPEN_TNC_GPIO
+//	GPIO Number definitions for OpenTNC hardware
+#define OPEN_TNC_PWM		20	// physical pin 26
+#define OPEN_TNC_PTT_OUT	16	// physical pin 21
+
+//	OpenTNC Leds are (Left to Right): RUN, CONNECT, CARRIER, PACKET, PTT
+#define OPEN_TNC_CARRIER	11	// physical pin 15
+#define OPEN_TNC_CONNECT	12	// physical pin 16
+#define OPEN_TNC_STATION	13	// physical pin 17
+#define OPEN_TNC_PTT_LED	14	// physical pin 19
+
+// CAN'T USE GPIO 19 (ISR_PIN) physical pin 25
+#define OPEN_TNC_SW0		18	// physical pin 24
+#define OPEN_TNC_SW1		21	// physical pin 27
+#define OPEN_TNC_SW2		22	// physical pin 29
+#endif
+
+
 // number of ports
 #define PORT_N 1    // number of ports, 1..3
 
@@ -158,9 +181,15 @@ typedef struct TNC {
 #define MIN_TNCEMU_TXDELAY 55
 
 /* Define IO Ports */
+#ifdef OPEN_TNC_GPIO
+#define DIP_SWITCH_0 OPEN_TNC_SW0
+#define DIP_SWITCH_1 OPEN_TNC_SW1
+#define DIP_SWITCH_2 OPEN_TNC_SW2
+#else
 #define DIP_SWITCH_0 16
 #define DIP_SWITCH_1 17
 #define DIP_SWITCH_2 18
+#endif
 
 #define CON_LED_GPIO 14 /* IO for Console LED */
 #define STA_LED_GPIO 15 /* IO for Station LED */

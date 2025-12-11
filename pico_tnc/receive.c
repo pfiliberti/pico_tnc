@@ -87,6 +87,16 @@ static void dma_handler(void) {
     dma_hw->ints1 = dma_hw->ints1;
 }
 
+#ifdef OPEN_TNC_CARRIER
+static const uint8_t cdt_pins[] = {
+    OPEN_TNC_CARRIER, // port 0
+    21, // port 1
+    22, // port 2
+    22, // dummy
+    22, // dummy
+};
+#else
+
 static const uint8_t cdt_pins[] = {
 //#ifdef PICO_DEFAULT_LED_PIN
 #ifdef USE_PICO_DEFAULT_PIN
@@ -99,7 +109,7 @@ static const uint8_t cdt_pins[] = {
     22, // dummy
     22, // dummy
 };
-
+#endif
 
 void receive_init(void)
 {
