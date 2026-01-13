@@ -5588,18 +5588,19 @@
 		(dnp no)
 		(uuid "29f30fca-2b2a-40d8-8849-96785272bab2")
 		(property "Reference" "R10"
-			(at 133.35 130.048 90)
+			(at 133.604 130.556 90)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Value" "100"
+		(property "Value" "100 Ohm"
 			(at 133.35 125.984 90)
 			(effects
 				(font
 					(size 1.27 1.27)
+					(thickness 0.1588)
 				)
 			)
 		)
