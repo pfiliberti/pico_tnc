@@ -54,7 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // greeting message
 static const uint8_t greeting[] =
-    "\r\nPico TNCEMU Emulated Z80 TNC Ver 0.71\r\n";
+    "\r\nPico TNCEMU Emulated Z80 TNC Ver 0.72\r\n";
 
 // Watchdog Timer Reset Message
 static const uint8_t wdtfailmsg[] =

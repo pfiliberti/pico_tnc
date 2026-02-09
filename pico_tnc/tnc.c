@@ -274,8 +274,13 @@ void tnc_emulate(void)
   if( timer_int >= 150000)
   {
     timer_int = 0;
-    cycles = Z80Interrupt (&state, 0x10 );
-    cycles += Z80Emulate(&state, CYCLES_PER_INT);
+    cycles = 0;
+    while(!state.iff1)
+    {
+      cycles += Z80Emulate(&state, CYCLES_PER_INT );
+      watchdog_update();
+    }
+    cycles += Z80Interrupt (&state, 0x10 );
     total += cycles;
     timer_int += cycles;
     sio_int += cycles;
@@ -395,7 +400,12 @@ void tnc_emulate(void)
       {
         if(RxCharIn_Idx)
         {
-          while(!state.iff1) cycles = Z80Emulate(&state, CYCLES_PER_INT );
+          cycles = 0;
+          while(!state.iff1)
+          {
+            cycles += Z80Emulate(&state, CYCLES_PER_INT );
+            watchdog_update();
+          }
           cycles += Z80Interrupt (&state, siob.registers[2] | 0x0c);   // ax25 char read int
           total += cycles;
           timer_int += cycles;
@@ -404,7 +414,12 @@ void tnc_emulate(void)
 
         if(ax25rdy)
         {
-          while(!state.iff1) cycles = Z80Emulate(&state, CYCLES_PER_INT );
+          cycles = 0;
+          while(!state.iff1)
+          {
+            cycles += Z80Emulate(&state, CYCLES_PER_INT );
+            watchdog_update();
+          }
           cycles += Z80Interrupt (&state, siob.registers[2] | 0x0e); // eof int
           total += cycles;
           timer_int += cycles;
@@ -428,7 +443,12 @@ void tnc_emulate(void)
 
         if(feedflag || abortflag )
         {
-          while(!state.iff1) cycles = Z80Emulate(&state, CYCLES_PER_INT );
+          cycles = 0;
+          while(!state.iff1)
+          {
+            cycles += Z80Emulate(&state, CYCLES_PER_INT );
+            watchdog_update();
+          }
           cycles += Z80Interrupt (&state, siob.registers[2] | 0x0a); // ext stat int
           total += cycles;
           timer_int += cycles;
@@ -438,7 +458,12 @@ void tnc_emulate(void)
         {
           if(siob.registers[1] & 2)
           {
-            while(!state.iff1) cycles += Z80Emulate(&state, CYCLES_PER_INT );
+            cycles = 0;
+            while(!state.iff1)
+            {
+              cycles += Z80Emulate(&state, CYCLES_PER_INT );
+              watchdog_update();
+            }
             cycles += Z80Interrupt (&state, siob.registers[2] );
             total += cycles;
             timer_int += cycles;
@@ -453,7 +478,13 @@ void tnc_emulate(void)
       {
 // This breaks inital autobaud!   if(state.iff1 && (siob.registers[1] & 0x18) )
 //      {
-        cycles = Z80Interrupt (&state, siob.registers[2] | 4);
+        cycles = 0;
+        while(!state.iff1)
+        {
+          cycles += Z80Emulate(&state, CYCLES_PER_INT );
+          watchdog_update();
+        }
+        cycles += Z80Interrupt (&state, siob.registers[2] | 4);
         total += cycles;
         timer_int += cycles;
         sio_int += cycles;
@@ -462,7 +493,13 @@ void tnc_emulate(void)
       } 
       else 
       {
-        cycles = Z80Interrupt (&state, siob.registers[2] | 8 );
+        cycles = 0;
+        while(!state.iff1)
+        {
+          cycles += Z80Emulate(&state, CYCLES_PER_INT );
+          watchdog_update();
+        }
+        cycles += Z80Interrupt (&state, siob.registers[2] | 8 );
         total += cycles;
         timer_int += cycles;
         sio_int += cycles;
