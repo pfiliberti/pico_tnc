@@ -200,6 +200,8 @@ int main()
             ts += TIME_10MS;
         }
 #endif
+        // receive packets
+        receive();
 
         // Emulate the virtual TNC z80 code
         tnc_emulate();
@@ -227,10 +229,9 @@ int main()
             }
         }
 
-        // receive packet
-        receive();
         // send packet
         send();
+
         // process uart I/O
         serial_input();
         serial_output();
