@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pico/stdlib.h"
 
 #include "ax25.h"
+#include "tnc.h" // Added by Codex
 
 
 /* Input Queue to stack multiple incoming packets */
@@ -170,6 +171,24 @@ bool ax25_InQ_HasRoom(void)
 
 void ax25_InQ_Insert(const uint8_t packet[], int length)
 {
+#if CODEX_RX_DIAGNOSTICS
+    // Added by Codex
+    extern struct {
+      unsigned int rx_queue_inserted;
+      unsigned int rx_queue_dropped_full;
+      unsigned int rx_queue_started;
+      unsigned int rx_queue_completed;
+      unsigned int rx_queue_restarts;
+      unsigned int rx_queue_max_depth;
+      unsigned int rx_packet_max_len;
+      unsigned int adc_dma_overruns;
+      unsigned int tx_out_overflows;
+    } codex_diag;
+
+    codex_diag.rx_queue_inserted++;
+    if ((unsigned int)length > codex_diag.rx_packet_max_len) codex_diag.rx_packet_max_len = length;
+#endif
+
     /* use length - 2 to remove crc bytes */
     for(int x=0; x < length-2; x++)
     { 
