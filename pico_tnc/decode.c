@@ -119,6 +119,23 @@ static void output_packet(tnc_t *tp)
  
     // Here check if ax25 Input Queue has room and if so insert
     if(ax25_InQ_HasRoom()) ax25_InQ_Insert(data, len);
+#if CODEX_RX_DIAGNOSTICS
+    else {
+        // Added by Codex
+        extern struct {
+        unsigned int rx_queue_inserted;
+        unsigned int rx_queue_dropped_full;
+        unsigned int rx_queue_started;
+        unsigned int rx_queue_completed;
+        unsigned int rx_queue_restarts;
+        unsigned int rx_queue_max_depth;
+        unsigned int rx_packet_max_len;
+        unsigned int adc_dma_overruns;
+        unsigned int tx_out_overflows;
+        } codex_diag;
+        codex_diag.rx_queue_dropped_full++;
+    }
+#endif
 
     for (int i = TTY_USB; i <= TTY_UART0; i++) {
         tty_t *ttyp = &tty[i];
