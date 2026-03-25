@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "tty.h"
 #include "send.h"
 #include "kiss.h"
+#include "receive.h" // added by Codex
 
 uint32_t __tnc_time;
 
@@ -48,9 +49,36 @@ tnc_t tnc[PORT_N];
 double  cycles,timer_int,sio_int;
 double  total;
 
+#if CODEX_RX_DIAGNOSTICS
+// Added by Codex
+struct {
+  unsigned int rx_queue_inserted;
+  unsigned int rx_queue_dropped_full;
+  unsigned int rx_queue_started;
+  unsigned int rx_queue_completed;
+  unsigned int rx_queue_restarts;
+  unsigned int rx_queue_max_depth;
+  unsigned int rx_packet_max_len;
+  unsigned int adc_dma_overruns;
+  unsigned int tx_out_overflows;
+  unsigned int receive_backlog_max;      // Added by Codex
+  unsigned int receive_drain_loops;      // Added by Codex
+  unsigned int receive_drain_max;        // Added by Codex
+  unsigned int emulate_long_passes;      // Added by Codex
+  unsigned int emulate_max_cycles;       // Added by Codex
+  unsigned int tx_bytes_from_emu;      // Added by Codex
+  unsigned int tx_ptt_asserts;         // Added by Codex
+  unsigned int tx_feedflag_sets;       // Added by Codex
+  unsigned int tx_extstat_interrupts;  // Added by Codex
+  unsigned int tx_sendpacket_calls;    // Added by Codex
+  unsigned int tx_sendpacket_fails;    // Added by Codex
+  unsigned char last_sioa_cmd;         // Added by Codex
+} codex_diag = {0};
+#endif
+
 /* tnc emulator */
 unsigned char flop,oldptt;
-unsigned char RxCharIn_Idx=0;
+unsigned int RxCharIn_Idx=0; // int so packets can't wrap at 255!
 unsigned char ax25rdy=0;
 unsigned char feedflag=0;
 unsigned char abortflag=0;
@@ -66,6 +94,8 @@ unsigned int  Ax25_In_Dly = 0;
 unsigned int PrevbbsMsgNo;
 unsigned int clock_address = 0; /* Clock stucture in TNC Ram */
 unsigned int bbsmsg_address = 0;
+
+unsigned int codex_wait_loops = 0; // Added by Codex
 
 uint32_t parm_check_time = 0;
 bool newMsg = false;
@@ -260,7 +290,7 @@ void tnc_emulate(void)
     unsigned int x;
     tnc_t *tp = &tnc[0];
 
-    #ifdef TNCEMUDEBUG
+#ifdef TNCEMUDEBUG
     printf("PC=%x cycles=%.0f\n",state.pc,total);
     cycles = Z80Emulate(&state, 1);
 #endif
@@ -269,21 +299,50 @@ void tnc_emulate(void)
     timer_int += cycles;
     sio_int += cycles;
 
+#if CODEX_RX_DIAGNOSTICS
+    // Added by Codex
+    if ((unsigned int)cycles > codex_diag.emulate_max_cycles)
+      codex_diag.emulate_max_cycles = (unsigned int)cycles;
+    if (cycles > (CYCLES_PER_PASS * 2))
+      codex_diag.emulate_long_passes++;
+#endif
+
+
   /* Every other run do a timer interrupt, we come into the emulator
   roughly ever 10ms not super acurate but it */
   if( timer_int >= 150000)
   {
     timer_int = 0;
     cycles = 0;
+#if CODEX_RX_DIAGNOSTICS
+    // Added by Codex
+    unsigned int codex_wait_loops = 0;
+#endif
+
     while(!state.iff1)
     {
       cycles += Z80Emulate(&state, CYCLES_PER_INT );
+#if CODEX_RX_DIAGNOSTICS
+      // Added by Codex
+      codex_wait_loops++;
+#endif
       watchdog_update();
+
+      // Added by Codex
+      if ((++codex_wait_loops & 0x03) == 0) {
+        receive();
+      }      
     }
     cycles += Z80Interrupt (&state, 0x10 );
     total += cycles;
     timer_int += cycles;
     sio_int += cycles;
+#if CODEX_RX_DIAGNOSTICS
+    // Added by Codex
+    if (codex_wait_loops > 50) codex_diag.emulate_long_passes++;
+    if (codex_wait_loops > codex_diag.emulate_max_cycles)
+      codex_diag.emulate_max_cycles = codex_wait_loops;
+#endif
   }
 
   /* Every second update our clock from pico rtc */
@@ -401,29 +460,65 @@ void tnc_emulate(void)
         if(RxCharIn_Idx)
         {
           cycles = 0;
+#if CODEX_RX_DIAGNOSTICS
+        // Added by Codex
+        unsigned int codex_wait_loops = 0;
+#endif
           while(!state.iff1)
           {
             cycles += Z80Emulate(&state, CYCLES_PER_INT );
+#if CODEX_RX_DIAGNOSTICS
+          // Added by Codex
+          codex_wait_loops++;
+#endif
             watchdog_update();
+            // Added by Codex
+            if ((++codex_wait_loops & 0x03) == 0) {
+              receive();
+            }            
           }
           cycles += Z80Interrupt (&state, siob.registers[2] | 0x0c);   // ax25 char read int
           total += cycles;
           timer_int += cycles;
           sio_int += cycles;
+#if CODEX_RX_DIAGNOSTICS
+          // Added by Codex
+          if (codex_wait_loops > 50) codex_diag.emulate_long_passes++;
+          if (codex_wait_loops > codex_diag.emulate_max_cycles)
+            codex_diag.emulate_max_cycles = codex_wait_loops;
+#endif
         }
 
         if(ax25rdy)
         {
           cycles = 0;
+#if CODEX_RX_DIAGNOSTICS
+          // Added by Codex
+          unsigned int codex_wait_loops = 0;
+#endif
           while(!state.iff1)
           {
             cycles += Z80Emulate(&state, CYCLES_PER_INT );
+#if CODEX_RX_DIAGNOSTICS
+            // Added by Codex
+            codex_wait_loops++;
+#endif
             watchdog_update();
+            // Added by Codex
+            if ((++codex_wait_loops & 0x03) == 0) {
+              receive();
+            }            
           }
           cycles += Z80Interrupt (&state, siob.registers[2] | 0x0e); // eof int
           total += cycles;
           timer_int += cycles;
           sio_int += cycles;
+#if CODEX_RX_DIAGNOSTICS
+          // Added by Codex
+          if (codex_wait_loops > 50) codex_diag.emulate_long_passes++;
+          if (codex_wait_loops > codex_diag.emulate_max_cycles)
+            codex_diag.emulate_max_cycles = codex_wait_loops;
+#endif
         }
       }
       else
@@ -433,41 +528,80 @@ void tnc_emulate(void)
           if(--txundr_count == 0)
           {
             feedflag = 1; /* txunderrun we can send packet!*/
+            codex_diag.tx_feedflag_sets++;
             if(Ax25_Out_Cnt)
             {
-              send_packet(&tnc[0], Ax25_Out, Ax25_Out_Cnt);
-              Ax25_Out_Cnt = 0;
+              codex_diag.tx_sendpacket_calls++;
+              if(!send_packet(&tnc[0], Ax25_Out, Ax25_Out_Cnt)) codex_diag.tx_sendpacket_fails++;
+              else Ax25_Out_Cnt = 0;
             }
           }
         }
 
         if(feedflag || abortflag )
         {
+          codex_diag.tx_extstat_interrupts++;
           cycles = 0;
+#if CODEX_RX_DIAGNOSTICS
+          // Added by Codex
+          unsigned int codex_wait_loops = 0;
+#endif
           while(!state.iff1)
           {
             cycles += Z80Emulate(&state, CYCLES_PER_INT );
+#if CODEX_RX_DIAGNOSTICS
+            // Added by Codex
+            codex_wait_loops++;
+#endif
             watchdog_update();
+            // Added by Codex
+            if ((++codex_wait_loops & 0x03) == 0) {
+              receive();
+            }
           }
           cycles += Z80Interrupt (&state, siob.registers[2] | 0x0a); // ext stat int
           total += cycles;
           timer_int += cycles;
           sio_int += cycles;
+#if CODEX_RX_DIAGNOSTICS
+          // Added by Codex
+          if (codex_wait_loops > 50) codex_diag.emulate_long_passes++;
+          if (codex_wait_loops > codex_diag.emulate_max_cycles)
+            codex_diag.emulate_max_cycles = codex_wait_loops;
+#endif
         }
         else
         {
           if(siob.registers[1] & 2)
           {
             cycles = 0;
+#if CODEX_RX_DIAGNOSTICS
+            // Added by Codex
+            unsigned int codex_wait_loops = 0;
+#endif
             while(!state.iff1)
             {
               cycles += Z80Emulate(&state, CYCLES_PER_INT );
+#if CODEX_RX_DIAGNOSTICS
+              // Added by Codex
+              codex_wait_loops++;
+#endif
               watchdog_update();
+              // Added by Codex
+              if ((++codex_wait_loops & 0x03) == 0) {
+                receive();
+              }              
             }
             cycles += Z80Interrupt (&state, siob.registers[2] );
             total += cycles;
             timer_int += cycles;
             sio_int += cycles;
+#if CODEX_RX_DIAGNOSTICS
+            // Added by Codex
+            if (codex_wait_loops > 50) codex_diag.emulate_long_passes++;
+            if (codex_wait_loops > codex_diag.emulate_max_cycles)
+              codex_diag.emulate_max_cycles = codex_wait_loops;
+#endif
           }
         }
       }
@@ -479,37 +613,83 @@ void tnc_emulate(void)
 // This breaks inital autobaud!   if(state.iff1 && (siob.registers[1] & 0x18) )
 //      {
         cycles = 0;
+#if CODEX_RX_DIAGNOSTICS
+          // Added by Codex
+          unsigned int codex_wait_loops = 0;
+#endif
         while(!state.iff1)
         {
           cycles += Z80Emulate(&state, CYCLES_PER_INT );
+#if CODEX_RX_DIAGNOSTICS
+          // Added by Codex
+          codex_wait_loops++;
+#endif
           watchdog_update();
+          // Added by Codex
+          if ((++codex_wait_loops & 0x03) == 0) {
+            receive();
+          }          
         }
         cycles += Z80Interrupt (&state, siob.registers[2] | 4);
         total += cycles;
         timer_int += cycles;
         sio_int += cycles;
+#if CODEX_RX_DIAGNOSTICS
+        // Added by Codex
+        if (codex_wait_loops > 50) codex_diag.emulate_long_passes++;
+        if (codex_wait_loops > codex_diag.emulate_max_cycles)
+          codex_diag.emulate_max_cycles = codex_wait_loops;
+#endif
 //      }
         tp->active_timeout = DEFAULT_ACTIVITY_COUNT;
       } 
       else 
       {
+#if CODEX_RX_DIAGNOSTICS
+    // Added by Codex
+        unsigned int codex_wait_loops = 0;
+#endif
         cycles = 0;
         while(!state.iff1)
         {
           cycles += Z80Emulate(&state, CYCLES_PER_INT );
+#if CODEX_RX_DIAGNOSTICS
+          // Added by Codex
+          codex_wait_loops++;
+#endif
           watchdog_update();
+          // Added by Codex
+          if ((++codex_wait_loops & 0x03) == 0) {
+            receive();
+          }
         }
         cycles += Z80Interrupt (&state, siob.registers[2] | 8 );
         total += cycles;
         timer_int += cycles;
         sio_int += cycles;
+#if CODEX_RX_DIAGNOSTICS
+    // Added by Codex
+        if (codex_wait_loops > 50) codex_diag.emulate_long_passes++;
+        if (codex_wait_loops > codex_diag.emulate_max_cycles)
+          codex_diag.emulate_max_cycles = codex_wait_loops;
+#endif
       }
     }
 
-    if(ax25_InQ_HasData() && !RxCharIn_Idx && !ax25rdy && !txundr_count  && !Ax25_In_Dly ) /* do we have a socket */
+    // if(ax25_InQ_HasData() && !RxCharIn_Idx && !ax25rdy && !txundr_count  && !Ax25_In_Dly ) /* do we have a socket */
+    // if(ax25_InQ_HasData() && !RxCharIn_Idx && !ax25rdy && !txundr_count && !(sioa.registers[5] & 2) && !Ax25_In_Dly )
+    if(ax25_InQ_HasData() && !RxCharIn_Idx && !ax25rdy && !txundr_count  && !Ax25_In_Dly && !feedflag && !abortflag ) /* do we have a socket */
     {
+#if CODEX_RX_DIAGNOSTICS
+      // Added by Codex
+      unsigned int queued = (Ax25_In_Head + AX25_IN_MAXSIZE - Ax25_In_Tail) % AX25_IN_MAXSIZE;
+      codex_diag.rx_queue_started++;
+      if (queued > codex_diag.rx_queue_max_depth) codex_diag.rx_queue_max_depth = queued;
+      if (codex_diag.rx_queue_started > codex_diag.rx_queue_completed + 1) codex_diag.rx_queue_restarts++;
+#endif
       RxCharIn_Idx = 1; /* Let everyone know */
       Ax25_In_Dly = 75; /* this is an arbitrary delay amount so emulator can process rx packets */
+
       /* Before removing any incoming ax25 packets send to any kiss ports */
       // incoming KISS frame to serial
       if(tty[0].kiss_mode) kiss_output(&tty[0],&tnc[0]);
@@ -527,7 +707,9 @@ void tnc_emulate(void)
 #endif
     if(oldptt == 2)
     {
+      codex_diag.tx_ptt_asserts++;
       txundr_count=10;
+      Ax25_Out_Cnt=0; // Matches tcp version
     }
   }
 
@@ -637,6 +819,10 @@ int IO_in (int port)
         if(--Ax25_In_Q[Ax25_In_Tail].count == 0) 
         {
           RxCharIn_Idx = 0;
+#if CODEX_RX_DIAGNOSTICS
+          // Added by Codex
+          codex_diag.rx_queue_completed++;
+#endif
           ax25_InQ_Remove();
           ax25rdy=1;
         }
@@ -650,9 +836,28 @@ int IO_in (int port)
     case 0x1A: // SIOB Data
       x = consoleInput();
 
-#ifdef TNCEMUDEBUG
+//#ifdef TNCEMUDEBUG
+#ifdef CODEX_RX_DIAGNOSTICS
       if(x == '&')
       {
+        // Added by Codex
+        printf("\nCodex RX diag: in=%u drop=%u start=%u done=%u restart=%u qmax=%u pktmax=%u adcovr=%u txovr=%u\n",
+          codex_diag.rx_queue_inserted,
+          codex_diag.rx_queue_dropped_full,
+          codex_diag.rx_queue_started,
+          codex_diag.rx_queue_completed,
+          codex_diag.rx_queue_restarts,
+          codex_diag.rx_queue_max_depth,
+          codex_diag.rx_packet_max_len,
+          codex_diag.adc_dma_overruns,
+          codex_diag.tx_out_overflows);
+        printf(" rxbacklog=%u drainloops=%u drainmax=%u elong=%u emax=%u\n",
+          codex_diag.receive_backlog_max,
+          codex_diag.receive_drain_loops,
+          codex_diag.receive_drain_max,
+          codex_diag.emulate_long_passes,
+          codex_diag.emulate_max_cycles); // Added by Codex
+
         printf("\n Diagnostic Info:\n");
         printf("txunder=%d, feedflag=%d, Ax25OutCount=%d\n",txundr_count,feedflag,Ax25_Out_Cnt);
         printf("abotr=%d, busy=%d, sendState=%d, sendQfree=%d \n",abortflag,tnc[0].busy,tnc[0].send_state,send_queue_free(&tnc[0]));
@@ -663,6 +868,29 @@ int IO_in (int port)
         printf("SIO REG 4 = %x ",sioa.registers[4]);
         printf("SIO REG 5 = %x\n",sioa.registers[5]);
         printf("SIO REG 6 = %x ",sioa.registers[6]);
+        printf("SIO REG 7 = %x\n",sioa.registers[7]); // Added by Codex
+        printf("SIO state=%d cmd_ptr=%d\n",sioa.state, sioa.cmd_ptr); // Added by Codex
+        printf("RxCharIn_Idx=%u ax25rdy=%d Ax25_In_Dly=%u\n", RxCharIn_Idx, ax25rdy, Ax25_In_Dly); // Added by Codex
+        printf("Ax25 In Head=%u Tail=%u HasData=%d\n", Ax25_In_Head, Ax25_In_Tail, ax25_InQ_HasData()); // Added by Codex
+        printf("Current In Count=%u\n", Ax25_In_Q[Ax25_In_Tail].count); // Added by Codex
+
+        printf("tx_bytes=%u ptt_asserts=%u feed_sets=%u extstat_ints=%u\n",
+          codex_diag.tx_bytes_from_emu,
+          codex_diag.tx_ptt_asserts,
+          codex_diag.tx_feedflag_sets,
+          codex_diag.tx_extstat_interrupts); // Added by Codex
+
+        printf("sendpkt_calls=%u sendpkt_fails=%u last_sioa_cmd=%02x\n",
+          codex_diag.tx_sendpacket_calls,
+          codex_diag.tx_sendpacket_fails,
+          codex_diag.last_sioa_cmd); // Added by Codex
+
+        printf("oldptt=%d send_busy=%d send_state=%d send_q_free=%d dac_q_level=%d\n",
+          oldptt,
+          tnc[0].busy,
+          tnc[0].send_state,
+          send_queue_free(&tnc[0]),
+          queue_get_level(&tnc[0].dac_queue)); // Added by Codex                
       }
 #endif
       break;
@@ -731,11 +959,23 @@ void IO_out (int port, int x)
       break;
 
     case 0x18: // SIOA Data
-      Ax25_Out[Ax25_Out_Cnt++] = x;
+      codex_diag.tx_bytes_from_emu ++;
+      if(Ax25_Out_Cnt < BUFLEN) // Check for possible overflow
+      {
+        Ax25_Out[Ax25_Out_Cnt++] = x;
+      }
+#if CODEX_RX_DIAGNOSTICS
+      else
+      {
+        // Added by Codex
+        codex_diag.tx_out_overflows++;
+      }
+#endif      
       txundr_count=10; /* reset tx underrun */
       break;
 
     case 0x19: // SIOA Cmd
+      codex_diag.last_sioa_cmd = x;
       SIO_Cmd_Write( &sioa, x);
       break;
 
@@ -771,14 +1011,39 @@ void IO_out (int port, int x)
 /* Reset SIO registers and cmd ptr */
 void SIO_Reset( IC_SIO *sio )
 {
+  // Added by Codex
+  // Fully clear the emulated SIO state so channel resets behave like a fresh device.
   sio->state = 0; // Set state for cmd reg
   sio->cmd_ptr = 0; // Set cmd ptr to reg 0
-  sio->registers[0] = 0; 
+
+  for (int i = 0; i < 8; i++) // Added by Codex
+  {
+    sio->registers[i] = 0; // Added by Codex
+  }
+
+  // Channel A owns the AX.25 sideband flags in this emulator, so clear them too.
+  if (sio == &sioa)
+  {
+    ax25rdy = 0;
+    feedflag = 0;
+    abortflag = 0;
+    txundr_count = 0;
+    Ax25_In_Dly = 0;
+    RxCharIn_Idx = 0;
+  }
 }
+
+// void SIO_Reset( IC_SIO *sio )
+// {
+//   sio->state = 0; // Set state for cmd reg
+//   sio->cmd_ptr = 0; // Set cmd ptr to reg 0
+//   sio->registers[0] = 0; 
+// }
 
 /* Handle Writes to SIO Command Port */
 void SIO_Cmd_Write( IC_SIO *sio, unsigned char x)
 {
+  unsigned char wr0_cmd = x & 0x38;
   if(sio->state) /* write to actual reg */
   {
 //    if(abortflag && sio->cmd_ptr == 5 && !(x & 2)) 
@@ -789,23 +1054,47 @@ void SIO_Cmd_Write( IC_SIO *sio, unsigned char x)
   }
   else /* set write register */
   {
-    if(x == 0x28) feedflag=0;
-    if(x == 8)  abortflag=1;/* Abort Seq SDLC */
-    if(x == 0x18 ) /* handle special reset case */
+    if(wr0_cmd != 0) /* A command for sio ? */
     {
-      sio->cmd_ptr = 0; /* after a write it sets back to 0 */
-      sio->state = 0; /* next state is command */
-    }
-    else 
-    {
-      if((x & 0x38)==0) 
+      switch (wr0_cmd) // Process special cmd
       {
-        sio->cmd_ptr = x & 0x07; /* lsb 3 bits select reg for next write/read */
-        sio->state = 1; /* flip state */
+        case 0x08:    // Abort SDLC Seq 
+          abortflag = 1;
+          break;
+
+        case 0x10:
+          // external status interrupt reset
+          break;
+
+        case 0x18:
+          SIO_Reset(sio); /* sio logic reset */
+          return;
+
+        case 0x20:
+          // enable interrupt on next receive char
+          break;
+
+        case 0x28: // Reset Interrupt Pending
+          feedflag = 0;
+          break;
+
+        case 0x30:
+          // CLear Latched error bits
+          break;
+
+        case 0x38:
+          // return from interrupt
+          break;
       }
     }
+    else // Cmd 0 = set reg address 
+    {
+      sio->cmd_ptr = x & 0x07; /* lsb 3 bits select reg for next write/read */
+      sio->state = 1; /* flip state */
+    }
+    // If bits 6  & 7 are set its a reset of EOM Status 
+    if((x & 0xc0) == 0xc0) feedflag = 0;
   }
-
 }
 
 /* Handle Reads from SIO Command Port */
