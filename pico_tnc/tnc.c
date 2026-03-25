@@ -95,8 +95,6 @@ unsigned int PrevbbsMsgNo;
 unsigned int clock_address = 0; /* Clock stucture in TNC Ram */
 unsigned int bbsmsg_address = 0;
 
-unsigned int codex_wait_loops = 0; // Added by Codex
-
 uint32_t parm_check_time = 0;
 bool newMsg = false;
 bool newMsgFlashState = false;
