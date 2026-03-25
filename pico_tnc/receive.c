@@ -64,6 +64,25 @@ static int dma_chan;
 
 static semaphore_t sem;
 
+#if CODEX_RX_DIAGNOSTICS
+    extern struct {
+        unsigned int rx_queue_inserted;
+        unsigned int rx_queue_dropped_full;
+        unsigned int rx_queue_started;
+        unsigned int rx_queue_completed;
+        unsigned int rx_queue_restarts;
+        unsigned int rx_queue_max_depth;
+        unsigned int rx_packet_max_len;
+        unsigned int adc_dma_overruns;
+        unsigned int tx_out_overflows;
+        unsigned int receive_backlog_max;      // Added by Codex
+        unsigned int receive_drain_loops;      // Added by Codex
+        unsigned int receive_drain_max;        // Added by Codex
+        unsigned int emulate_long_passes;      // Added by Codex
+        unsigned int emulate_max_cycles;       // Added by Codex
+    } codex_diag;
+#endif
+
 static void dma_handler(void) {
     static int buf_next = 1;
 #if 0
@@ -75,6 +94,13 @@ static void dma_handler(void) {
 
     // set buffer address
     dma_channel_set_write_addr(dma_chan, buf[buf_next], true); // trigger DMA
+
+#if CODEX_RX_DIAGNOSTICS
+// Added by Codex
+    if (sem_available(&sem) >= BUF_NUM - 1) {
+        codex_diag.adc_dma_overruns++;
+    }
+#endif
 
     // release semaphore
     sem_release(&sem);
@@ -210,42 +236,68 @@ void receive(void)
 {
     static int buf_next = 0;
     static uint8_t port = 0;
+    bool did_work = false; // Added by Codex
 
-    // wait for ADC samples
-    if (!sem_acquire_timeout_ms(&sem, 0)) return;
+#if CODEX_RX_DIAGNOSTICS
+    unsigned int drained = 0;
+    int backlog = sem_available(&sem);
+    if ((unsigned int)backlog > codex_diag.receive_backlog_max)
+        codex_diag.receive_backlog_max = backlog;
+#endif
+
+    // Added by Codex   
+    // Drain all pending ADC/DMA buffers so RX can catch back up after long emulator passes.
+    while (sem_acquire_timeout_ms(&sem, 0)) {
+
+        did_work = true; // Added by Codex
 
 #ifdef BUSY_PIN
-    gpio_put(BUSY_PIN, 1);
+        gpio_put(BUSY_PIN, 1);
 #endif
 
-    ++__tnc_time; // advance 10ms timer
+        ++__tnc_time; // advance 10ms timer
 
-    // process adc data
-    for (int i = 0; i < BUF_LEN; i++) {
-        int val = buf[buf_next][i];
-        tnc_t *tp = &tnc[port];
+        // process adc data
+        for (int i = 0; i < BUF_LEN; i++) {
+            int val = buf[buf_next][i];
+            tnc_t *tp = &tnc[port];
 
-        if (++port >= PORT_N) port = 0; // ADC ch round robin
+            if (++port >= PORT_N) port = 0; // ADC ch round robin
 
-        // decode Bell202
-#if 0
-#if ADC_BIT == 8
-        demodulator(tp, val - 128);
-#else
-        demodulator(tp, val - 2048);
+            // decode Bell202
+    #if 0
+    #if ADC_BIT == 8
+            demodulator(tp, val - 128);
+    #else
+            demodulator(tp, val - 2048);
+    #endif
+    #else
+            demodulator(tp, val); // pass raw value
+    #endif
+
+        }
+
+        // advance next buffer
+        ++buf_next;
+        buf_next &= BUF_NUM - 1;
+
+#if CODEX_RX_DIAGNOSTICS
+        // Added by Codex
+        drained++;
 #endif
-#else
-        demodulator(tp, val); // pass raw value
-#endif
-
     }
 
-    // advance next buffer
-    ++buf_next;
-    buf_next &= BUF_NUM - 1;
+#if CODEX_RX_DIAGNOSTICS
+    // Added by Codex
+    if (drained) {
+        codex_diag.receive_drain_loops++;
+        if (drained > codex_diag.receive_drain_max)
+            codex_diag.receive_drain_max = drained;
+    }
+#endif
 
 #ifdef BUSY_PIN
-    gpio_put(BUSY_PIN, 0);
+    if(did_work) gpio_put(BUSY_PIN, 0);
 #endif
 }
 
