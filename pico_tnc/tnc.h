@@ -35,6 +35,16 @@
 #define OPEN_TNC_SW2		22	// physical pin 29
 #endif
 
+// Added by Codex
+// Set to 1 to enable extra runtime diagnostics around RX/TNC handoff.
+#ifndef CODEX_RX_DIAGNOSTICS
+#define CODEX_RX_DIAGNOSTICS 1
+#endif
+
+// Set to 1 to enable extra TNC EMULATION diagnostics.
+//#ifndef TNCEMUDEBUG
+//#define TNCEMUDEBUG 1
+//#endif
 
 // number of ports
 #define PORT_N 1    // number of ports, 1..3
@@ -77,7 +87,6 @@
 
 /* Additional Z80_STATE status flag to request emulation termination. */
 #define FLAG_STOP_EMULATION     (1 << 31)
-//#define TNCEMUDEBUG 1
 
 /* Emulation Defines */
 #define Z80_CPU_SPEED           8195200   /* In Hz. */
