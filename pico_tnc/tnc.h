@@ -37,9 +37,9 @@
 
 // Added by Codex
 // Set to 1 to enable extra runtime diagnostics around RX/TNC handoff.
-#ifndef CODEX_RX_DIAGNOSTICS
-#define CODEX_RX_DIAGNOSTICS 1
-#endif
+// #ifndef CODEX_RX_DIAGNOSTICS
+// #define CODEX_RX_DIAGNOSTICS 1
+// #endif
 
 // Set to 1 to enable extra TNC EMULATION diagnostics.
 //#ifndef TNCEMUDEBUG

@@ -312,25 +312,22 @@ void tnc_emulate(void)
   {
     timer_int = 0;
     cycles = 0;
-#if CODEX_RX_DIAGNOSTICS
     // Added by Codex
     unsigned int codex_wait_loops = 0;
-#endif
 
     while(!state.iff1)
     {
       cycles += Z80Emulate(&state, CYCLES_PER_INT );
-#if CODEX_RX_DIAGNOSTICS
       // Added by Codex
       codex_wait_loops++;
-#endif
       watchdog_update();
-
       // Added by Codex
-      if ((++codex_wait_loops & 0x03) == 0) {
+      if ((++codex_wait_loops & 0x03) == 0)
+      {
         receive();
       }      
     }
+
     cycles += Z80Interrupt (&state, 0x10 );
     total += cycles;
     timer_int += cycles;
@@ -458,20 +455,18 @@ void tnc_emulate(void)
         if(RxCharIn_Idx)
         {
           cycles = 0;
-#if CODEX_RX_DIAGNOSTICS
-        // Added by Codex
-        unsigned int codex_wait_loops = 0;
-#endif
+          // Added by Codex
+          unsigned int codex_wait_loops = 0;
+
           while(!state.iff1)
           {
             cycles += Z80Emulate(&state, CYCLES_PER_INT );
-#if CODEX_RX_DIAGNOSTICS
-          // Added by Codex
-          codex_wait_loops++;
-#endif
+            // Added by Codex
+            codex_wait_loops++;
             watchdog_update();
             // Added by Codex
-            if ((++codex_wait_loops & 0x03) == 0) {
+            if ((++codex_wait_loops & 0x03) == 0)
+            {
               receive();
             }            
           }
@@ -490,20 +485,17 @@ void tnc_emulate(void)
         if(ax25rdy)
         {
           cycles = 0;
-#if CODEX_RX_DIAGNOSTICS
           // Added by Codex
           unsigned int codex_wait_loops = 0;
-#endif
           while(!state.iff1)
           {
             cycles += Z80Emulate(&state, CYCLES_PER_INT );
-#if CODEX_RX_DIAGNOSTICS
             // Added by Codex
             codex_wait_loops++;
-#endif
             watchdog_update();
             // Added by Codex
-            if ((++codex_wait_loops & 0x03) == 0) {
+            if ((++codex_wait_loops & 0x03) == 0)
+            {
               receive();
             }            
           }
@@ -526,34 +518,41 @@ void tnc_emulate(void)
           if(--txundr_count == 0)
           {
             feedflag = 1; /* txunderrun we can send packet!*/
+#ifdef CODEX_RX_DIAGNOSTICS
             codex_diag.tx_feedflag_sets++;
+#endif
             if(Ax25_Out_Cnt)
             {
+#ifdef CODEX_RX_DIAGNOSTICS
               codex_diag.tx_sendpacket_calls++;
-              if(!send_packet(&tnc[0], Ax25_Out, Ax25_Out_Cnt)) codex_diag.tx_sendpacket_fails++;
+              if(!send_packet(&tnc[0], Ax25_Out, Ax25_Out_Cnt)) 
+                codex_diag.tx_sendpacket_fails++;
               else Ax25_Out_Cnt = 0;
+#else
+              if(send_packet(&tnc[0], Ax25_Out, Ax25_Out_Cnt)) 
+                Ax25_Out_Cnt = 0;
+#endif
             }
           }
         }
 
         if(feedflag || abortflag )
         {
+#ifdef CODEX_RX_DIAGNOSTICS
           codex_diag.tx_extstat_interrupts++;
+#endif
           cycles = 0;
-#if CODEX_RX_DIAGNOSTICS
           // Added by Codex
           unsigned int codex_wait_loops = 0;
-#endif
           while(!state.iff1)
           {
             cycles += Z80Emulate(&state, CYCLES_PER_INT );
-#if CODEX_RX_DIAGNOSTICS
             // Added by Codex
             codex_wait_loops++;
-#endif
             watchdog_update();
             // Added by Codex
-            if ((++codex_wait_loops & 0x03) == 0) {
+            if ((++codex_wait_loops & 0x03) == 0)
+            {
               receive();
             }
           }
@@ -573,20 +572,17 @@ void tnc_emulate(void)
           if(siob.registers[1] & 2)
           {
             cycles = 0;
-#if CODEX_RX_DIAGNOSTICS
             // Added by Codex
             unsigned int codex_wait_loops = 0;
-#endif
             while(!state.iff1)
             {
               cycles += Z80Emulate(&state, CYCLES_PER_INT );
-#if CODEX_RX_DIAGNOSTICS
               // Added by Codex
               codex_wait_loops++;
-#endif
               watchdog_update();
               // Added by Codex
-              if ((++codex_wait_loops & 0x03) == 0) {
+              if ((++codex_wait_loops & 0x03) == 0)
+              {
                 receive();
               }              
             }
@@ -611,20 +607,17 @@ void tnc_emulate(void)
 // This breaks inital autobaud!   if(state.iff1 && (siob.registers[1] & 0x18) )
 //      {
         cycles = 0;
-#if CODEX_RX_DIAGNOSTICS
-          // Added by Codex
-          unsigned int codex_wait_loops = 0;
-#endif
+        // Added by Codex
+        unsigned int codex_wait_loops = 0;
         while(!state.iff1)
         {
           cycles += Z80Emulate(&state, CYCLES_PER_INT );
-#if CODEX_RX_DIAGNOSTICS
           // Added by Codex
           codex_wait_loops++;
-#endif
           watchdog_update();
           // Added by Codex
-          if ((++codex_wait_loops & 0x03) == 0) {
+          if ((++codex_wait_loops & 0x03) == 0)
+          {
             receive();
           }          
         }
@@ -643,21 +636,18 @@ void tnc_emulate(void)
       } 
       else 
       {
-#if CODEX_RX_DIAGNOSTICS
-    // Added by Codex
+        // Added by Codex
         unsigned int codex_wait_loops = 0;
-#endif
         cycles = 0;
         while(!state.iff1)
         {
           cycles += Z80Emulate(&state, CYCLES_PER_INT );
-#if CODEX_RX_DIAGNOSTICS
           // Added by Codex
           codex_wait_loops++;
-#endif
           watchdog_update();
           // Added by Codex
-          if ((++codex_wait_loops & 0x03) == 0) {
+          if ((++codex_wait_loops & 0x03) == 0)
+          {
             receive();
           }
         }
@@ -705,7 +695,9 @@ void tnc_emulate(void)
 #endif
     if(oldptt == 2)
     {
+#ifdef CODEX_RX_DIAGNOSTICS
       codex_diag.tx_ptt_asserts++;
+#endif
       txundr_count=10;
       Ax25_Out_Cnt=0; // Matches tcp version
     }
@@ -957,7 +949,9 @@ void IO_out (int port, int x)
       break;
 
     case 0x18: // SIOA Data
+#ifdef CODEX_RX_DIAGNOSTICS
       codex_diag.tx_bytes_from_emu ++;
+#endif
       if(Ax25_Out_Cnt < BUFLEN) // Check for possible overflow
       {
         Ax25_Out[Ax25_Out_Cnt++] = x;
@@ -973,7 +967,9 @@ void IO_out (int port, int x)
       break;
 
     case 0x19: // SIOA Cmd
+#if CODEX_RX_DIAGNOSTICS
       codex_diag.last_sioa_cmd = x;
+#endif
       SIO_Cmd_Write( &sioa, x);
       break;
 
