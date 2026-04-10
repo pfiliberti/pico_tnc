@@ -220,7 +220,7 @@ typedef struct TNC {
     uint8_t ctrl_chan;
     uint8_t data_chan;
     uint32_t data_chan_mask;
-    uint8_t busy;
+    bool busy;
 
     // Bell202 wave generator
     int next;
