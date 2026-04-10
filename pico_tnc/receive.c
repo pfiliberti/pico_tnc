@@ -272,9 +272,26 @@ void receive(void)
             demodulator(tp, val - 2048);
     #endif
     #else
-            demodulator(tp, val); // pass raw value
-    #endif
+// Added by Codex
+            static bool rx_muted = false;
 
+            if (tp->busy) 
+            {
+                // Drop RX decode while transmitting to avoid self-triggered DCD / false HDLC.
+                if (!rx_muted) {
+                    // Added by Codex
+                    // Reset receive state once on entry to TX so stale bits/flags do not survive.
+                    tp->state = FLAG;
+                    tp->cdt = false;
+                    tp->cdt_lvl = 0;
+                    gpio_put(tp->cdt_pin, 0);
+                }
+            } else 
+            {
+                demodulator(tp, val);
+            }
+            rx_muted = tp->busy;
+    #endif
         }
 
         // advance next buffer
