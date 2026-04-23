@@ -37,7 +37,7 @@ typedef struct CALLSIGN {
 
 /* for tncemu ax25 queue*/
 #define BUFLEN 2048	//Max length of buffer
-#define AX25_IN_MAXSIZE 16 // Was 10
+#define AX25_IN_MAXSIZE 8 // Was 10
 
 struct inQueue {
 unsigned char data[BUFLEN];
