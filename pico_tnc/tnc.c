@@ -85,6 +85,7 @@ unsigned char abortflag=0;
 unsigned char txundr_count=0;
 unsigned short int mycrc;
 int rxcnt;
+unsigned int codex_rx_bias = 0;
 
 /* Output Buffer */
 unsigned char Ax25_Out[BUFLEN];
@@ -443,9 +444,22 @@ void tnc_emulate(void)
     }
   }
 
-  if(sio_int > 55000 )
+  if(sio_int > 15000 )
   {
-    flop = flop ^0x01;
+    if (ax25_InQ_HasData() || RxCharIn_Idx || ax25rdy) {
+    // favor RX branch most of the time
+    if (++codex_rx_bias < 9) 
+    {
+        flop = 1;   // Added by Codex
+    } else 
+    {
+        flop = 0;   // Added by Codex
+        codex_rx_bias = 0; // Added by Codex
+    }
+    } else {
+        flop ^= 1;
+    }
+//    flop = flop ^0x01;
     sio_int = 0;
     if(flop)
     {
