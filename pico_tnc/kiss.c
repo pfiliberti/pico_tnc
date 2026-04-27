@@ -85,15 +85,15 @@ void kiss_packet(tty_t *ttyp)
             break;
 
         case KISS_TXDLY:
-            tp->ax25_parms[KISS_TXDELAY] = val;
+            // tp->ax25_parms[KISS_TXDELAY] = val; /* Don't let kiss change use tnc defaults */
             break;
 
         case KISS_PERSISTENCE:
-            tp->ax25_parms[KISS_P] = val;
+            // tp->ax25_parms[KISS_P] = val; /* Don't let kiss change use tnc defaults */
             break;
 
         case KISS_SLOTTIME:
-            tp->ax25_parms[KISS_SLOT] = val;
+            // tp->ax25_parms[KISS_SLOT] = val; /* Don't let kiss change use tnc defaults */
             break;
 
         case KISS_FULLDPLX:
