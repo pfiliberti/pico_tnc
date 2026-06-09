@@ -1,6 +1,6 @@
 # PICO TNC
 
-PICO TNC is the Terminal Node Controler for Amateur Packet Radio powered by Raspberry Pi Pico. This is a fork of that project. I have removed all of the major features of the code except for the modulator/demodulator section and inserted a z80 emulator from my TNCEMU project that emulates a Heathkit HK21 Pocket Packet. Introductory Video can be seen here: https://youtu.be/zq6JLoosqGQ
+PICO TNC aka (Pocket Pico) is the Terminal Node Controler for Amateur Packet Radio powered by Raspberry Pi Pico. This is a fork of that project. I have removed all of the major features of the code except for the modulator/demodulator section and inserted a z80 emulator from my TNCEMU project that emulates a Heathkit HK21 Pocket Packet. Introductory Video can be seen here: https://youtu.be/zq6JLoosqGQ
 ![pcb_art](pico-tnc.jpg)
 
 ## PIC TNC features
