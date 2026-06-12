@@ -28,6 +28,18 @@ cmake ..
 make -j4
 (flash 'pico_tnc/pico_tnc.uf2' file to your Pico)
 ```
+## Building with Docker
+```
+git clone https://github.com/pfiliberti/pico_tnc.git
+cd pico_tnc
+docker build -t pico-builder .
+docker run -it -rm -v "$PWD:vagrant" -w /vagrant pico-builder
+mkdir -p build
+cd build
+cmake ..
+make -j4
+(flash 'pico_tnc/pico_tnc.uf2' file to your Pico)
+```
 ![bell202-wave](bell202-wave.png)
 ![terminal-scrren](command.png)
 [![schemantic](schematic.jpg)](schematic.png)
