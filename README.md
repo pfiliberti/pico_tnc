@@ -33,7 +33,7 @@ make -j4
 git clone https://github.com/pfiliberti/pico_tnc.git
 cd pico_tnc
 docker build -t pico-builder .
-docker run -it -rm -v "$PWD:vagrant" -w /vagrant pico-builder
+docker run -it --rm -v "$PWD:/vagrant" -w /vagrant pico-builder
 mkdir -p build
 cd build
 cmake ..
