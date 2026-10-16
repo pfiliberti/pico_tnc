@@ -85,6 +85,7 @@ int bell202_decode(tnc_t *tp, int adc)
 #endif
 }
 
+
 #ifdef BELL202_SYNC
 
 #define LOW_N SAMPLING_N

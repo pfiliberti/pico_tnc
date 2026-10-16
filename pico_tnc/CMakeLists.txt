@@ -6,6 +6,7 @@ add_executable(pico_tnc
         decode.c
         filter.c
         bell202.c
+        hf_demod.c
         ax25.c
         usb_input.c
         usb_output.c

@@ -236,6 +236,12 @@ void receive(void)
 {
     static int buf_next = 0;
     static uint8_t port = 0;
+#if CODEX_RX_DIAGNOSTICS
+    static uint32_t hf_last;
+    uint32_t hf_t0 = time_us_32();
+    if (hf_last && hf_t0 - hf_last > hf_diag_tmax[0]) hf_diag_tmax[0] = hf_t0 - hf_last;
+    hf_last = hf_t0;
+#endif
     bool did_work = false; // Added by Codex
 
 #if CODEX_RX_DIAGNOSTICS
@@ -282,6 +288,9 @@ void receive(void)
                     // Added by Codex
                     // Reset receive state once on entry to TX so stale bits/flags do not survive.
                     tp->state = FLAG;
+#ifdef HF_TONE_DEMOD
+                    hf_demod_abort(&tp->hf);
+#endif
                     tp->cdt = false;
                     tp->cdt_lvl = 0;
                     gpio_put(tp->cdt_pin, 0);
@@ -315,6 +324,9 @@ void receive(void)
 
 #ifdef BUSY_PIN
     if(did_work) gpio_put(BUSY_PIN, 0);
+#endif
+#if CODEX_RX_DIAGNOSTICS
+    HF_T_END(1);
 #endif
 }
 
