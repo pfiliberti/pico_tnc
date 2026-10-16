@@ -425,12 +425,22 @@ void tnc_emulate(void)
       }
     }
 
-    if(flashUpdate)
-    {
-      flashUpdate = false;
+    /* A flash save must not overlap a transmission: while flash is erased the
+       chip cannot read it, which froze the TNC with PTT on (seen at 300 baud,
+       where transmissions are long). Hold the save until the radio is idle. */
+    static bool flashPending = false;
+    if(flashUpdate) flashPending = true;
 
-      /* Disable watchdog during flash writes */
-      watchdog_disable();
+    bool txIdle = !tp->busy && tp->send_state == SP_IDLE && queue_is_empty(&tp->send_queue)
+                  && Ax25_Out_Cnt == 0 && !txundr_count && !(sioa.registers[5] & 2);
+
+    if(flashPending && txIdle)
+    {
+      flashPending = false;
+
+      /* Keep the watchdog running during flash writes, with a longer timeout,
+         so a hang still resets the Pico (and drops PTT) instead of freezing */
+      watchdog_enable(8000, true);
 
       consoleOutputStr("TNCEMU:Saving Ram Data to Flash ");
       int slot = flash_write(Ram, sizeof(Ram));

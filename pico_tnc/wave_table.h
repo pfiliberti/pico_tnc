@@ -19,8 +19,11 @@
 #define PIO_DAC_FS (BIT_CYCLE * BAUD * 32)
 
 
+/* The tables live in RAM (not const) because the transmit DMA reads them
+   directly; reading flash while it is being written froze the chip. */
+
 /* sine table for delta sigma modulation, 1600Hz */
-static const uint32_t mark_tab[333] = {
+static uint32_t mark_tab[333] = {
     0x00000000, 0x00000000, 0x00000008, 0x00800004,
     0x00200080, 0x20100802, 0x04081020, 0x10421041,
     0x88884421, 0x91224488, 0x29249244, 0xa5294949,
@@ -108,7 +111,7 @@ static const uint32_t mark_tab[333] = {
 };
 
 /* sine table for delta sigma modulation, 1800Hz */
-static const uint32_t space_tab[328] = {
+static uint32_t space_tab[328] = {
     0x00000000, 0x00000000, 0x10000001, 0x80010000,
     0x80400800, 0x40810100, 0x08410810, 0x88884421,
     0x91244488, 0x94924924, 0xa95294a4, 0x52aaa954,
