@@ -106,10 +106,74 @@ static void display_packet(tty_t *ttyp, tnc_t *tp)
 #endif
 }
 
+#if CODEX_RX_DIAGNOSTICS
+// HF receive test counters, printed with '&'
+unsigned int hf_diag_good, hf_diag_fcs_bad, hf_diag_short, hf_diag_bad_long;
+volatile bool hf_diag_reset_pending;
+unsigned int hf_diag_zc, hf_diag_ns;   // zero crossings / samples since frame start
+int hf_diag_hz[12];                     // average tone Hz of recent long frames (+ good, - bad)
+int hf_diag_hz_n;
+
+static void hf_diag_tone(bool good)
+{
+    if (hf_diag_ns == 0 || hf_diag_hz_n >= 12) return;
+    int hz = (int)((uint64_t)hf_diag_zc * SAMPLING_RATE / (2 * hf_diag_ns));
+    hf_diag_hz[hf_diag_hz_n++] = good ? hz : -hz;
+}
+int hf_diag_adc_min = 255, hf_diag_adc_max = 0;
+// longest time in us: 0 gap between receive() calls, 1 receive, 2 tnc_emulate,
+// 3 send, 4 serial, 5 Z80 pass, 6 wfi, 7 kiss + dip switch
+uint32_t hf_diag_tmax[8];
+#endif
+#if CODEX_RX_DIAGNOSTICS
+#endif
+
+#ifdef HF_TONE_DEMOD
+// good frame from the HF multi-decoder
+void hf_frame_out(const uint8_t *data, int len)
+{
+    if (ax25_InQ_HasRoom()) ax25_InQ_Insert(data, len);
+#if CODEX_RX_DIAGNOSTICS
+    else codex_diag_rx_dropped();
+#endif
+}
+
+#if CODEX_RX_DIAGNOSTICS
+void hf_frame_event(bool start, bool good, int len)
+{
+    (void)len;
+    if (start) {
+        hf_diag_zc = hf_diag_ns = 0;
+        return;
+    }
+    if (good) hf_diag_good++;
+    else hf_diag_bad_long++;
+    hf_diag_tone(good);
+}
+#endif
+#endif // HF_TONE_DEMOD
+
 static void output_packet(tnc_t *tp)
 {
     int len = tp->data_cnt;
     uint8_t *data = tp->data;
+
+#if CODEX_RX_DIAGNOSTICS
+    if (len < MIN_LEN) {
+        if (len >= 3) hf_diag_short++;  // ignore flag-to-flag noise
+        return;
+    }
+    if (ax25_fcs(0, data, len) != FCS_OK) {
+        hf_diag_fcs_bad++;
+        if (len >= 40) {  // long enough to be a real packet, not noise
+            hf_diag_bad_long++;
+            hf_diag_tone(false);
+        }
+        return;
+    }
+    hf_diag_good++;
+    hf_diag_tone(true);
+#endif
 
     if (len < MIN_LEN) return;
  
@@ -166,6 +230,9 @@ static void decode_bit(tnc_t *tp, int bit)
 	    if (tp->flag == AX25_FLAG) // found flag
         {
 	        tp->state = DATA;
+#if CODEX_RX_DIAGNOSTICS
+	        hf_diag_zc = hf_diag_ns = 0;
+#endif
 	        tp->data_cnt = 0;
 	        tp->data_bit_cnt = 0;
 	        //fprintf(stderr, "found AX25_FALG\n");
@@ -292,6 +359,11 @@ void demodulator(tnc_t *tp, int adc)
     int val;
     int bit;
 
+#if CODEX_RX_DIAGNOSTICS
+    if (adc < hf_diag_adc_min) hf_diag_adc_min = adc;
+    if (adc > hf_diag_adc_max) hf_diag_adc_max = adc;
+#endif
+
     //printf("%d,", adc);
 
     //dac_output_voltage(DAC_CHANNEL_1, adc >> 4);
@@ -325,6 +397,9 @@ void demodulator(tnc_t *tp, int adc)
     if (tp->cdt && tp->cdt_lvl < CDT_THR_LOW)
     {
         tp->state = FLAG;
+#ifdef HF_TONE_DEMOD
+        hf_demod_abort(&tp->hf);
+#endif
         tp->cdt = false;
         gpio_put(tp->cdt_pin, 0);
     }
@@ -372,7 +447,26 @@ void demodulator(tnc_t *tp, int adc)
 	//val = bell202_decode((int)adc - average);
 	//val = bell202_decode((int)adc - 2048);
 	//val = bell202_decode(tp, adc); // delayed decode
-#ifdef BELL202_SYNC
+#ifdef HF_TONE_DEMOD
+	{
+	    // HF: band-pass, then all decoders; DCD while any decoder is locked in a frame
+	    val = filter(&tp->bpf, adc) >> ADC_BIT;
+#if CODEX_RX_DIAGNOSTICS
+	    {
+	        static int prev;
+	        if ((val < 0) != (prev < 0)) hf_diag_zc++;
+	        hf_diag_ns++;
+	        prev = val;
+	    }
+#endif
+	    bool locked = hf_demod_sample(&tp->hf, val, tnc_time());
+	    if (locked != tp->cdt) {
+	        tp->cdt = locked;
+	        gpio_put(tp->cdt_pin, locked);
+	    }
+	    return;
+	}
+#elif defined(BELL202_SYNC)
 	val = bell202_decode2(tp, adc); // sync decode
 #else
 	val = bell202_decode(tp, adc); // delayed decode
@@ -395,8 +489,10 @@ void demodulator(tnc_t *tp, int adc)
 
 	//printf("bit val = %d\n", val);
 
+#ifndef HF_TONE_DEMOD
 	if (val < -LPF_THRESHOLD) tp->bit = 1;
 	else if (val >= LPF_THRESHOLD) tp->bit = 0;
+#endif
 
 	//dac_output_voltage(DAC_CHANNEL_2, bit * 128);
 	//printf("%d\n", bit);

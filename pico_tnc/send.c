@@ -65,6 +65,9 @@ static const int ptt_pins[] = {
 
 #define CAL_TIMEOUT (60 * 100)  // 60 sec
 
+// time in 10 ms units into number of 8-bit flags at BAUD (1200 baud: * 3 / 2, 300 baud: * 3 / 8)
+#define TIME_TO_FLAGS(t) (((t) * BAUD + 400) / 800)
+
 static void __isr dma_handler(void)
 {
     int int_status = dma_hw->ints0;
@@ -397,7 +400,7 @@ void send(void)
             case SP_PTT_ON:
                 //printf("(%d) send: SP_PTT_ON\n", tnc_time());
                 //gpio_put(tp->ptt_pin, 1);
-                tp->send_len = (tp->ax25_parms[KISS_TXDELAY]  * 3) / 2 + 1; // TXDELAY * 10 [ms] into number of flags
+                tp->send_len = TIME_TO_FLAGS(tp->ax25_parms[KISS_TXDELAY]) + 1; // TXDELAY * 10 [ms] into number of flags
                 tp->send_state = SP_SEND_FLAGS;
                 /* FALLTHROUGH */
 
@@ -440,7 +443,7 @@ void send(void)
                 //printf("(%d) send: SP_DATA\n", tnc_time());
                 if (!send_byte(tp, tp->send_data, true)) break;
                 if (tp->send_len <= 0) {
-                    tp->send_len = (tp->ax25_parms[KISS_TXTAIL]  * 3) / 2 + MIN_TAIL_FLAGS; // TXAIL * 10 [ms] into number of flags
+                    tp->send_len = TIME_TO_FLAGS(tp->ax25_parms[KISS_TXTAIL]) + MIN_TAIL_FLAGS; // TXAIL * 10 [ms] into number of flags
                     tp->send_state = SP_SEND_FLAGS;
                     send_start(tp);
                     continue;

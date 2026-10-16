@@ -202,9 +202,33 @@ int main()
 #endif
         // receive packets
         receive();
+#if CODEX_RX_DIAGNOSTICS
+        {
+            // start the HF counters fresh once a '&' printout has finished
+            extern volatile bool hf_diag_reset_pending;
+            extern unsigned int hf_diag_good, hf_diag_fcs_bad, hf_diag_short, hf_diag_bad_long;
+            extern int hf_diag_adc_min, hf_diag_adc_max;
+            if (hf_diag_reset_pending) {
+                hf_diag_reset_pending = false;
+                for (int i = 0; i < 8; i++) hf_diag_tmax[i] = 0;
+                hf_diag_good = hf_diag_fcs_bad = hf_diag_short = hf_diag_bad_long = 0;
+                for (int i = 0; i < HF_DEC_N; i++) tnc[0].hf.hits[i] = 0;
+                tnc[0].hf.dup = 0;
+                { extern int hf_diag_hz_n; hf_diag_hz_n = 0; }
+                hf_diag_adc_min = 255;
+                hf_diag_adc_max = 0;
+                codex_diag_clear_overruns();
+            }
+        }
+#endif
 
         // Emulate the virtual TNC z80 code
-        tnc_emulate();
+        {
+            HF_T_START;
+            tnc_emulate();
+            HF_T_END(2);
+        }
+        HF_T_START;
 
         /* check if any ports are kiss and have input */
         // incoming KISS frame from serial
@@ -229,12 +253,22 @@ int main()
             }
         }
 
+        HF_T_END(7);
+
         // send packet
-        send();
+        {
+            HF_T_START;
+            send();
+            HF_T_END(3);
+        }
 
         // process uart I/O
-        serial_input();
-        serial_output();
+        {
+            HF_T_START;
+            serial_input();
+            serial_output();
+            HF_T_END(4);
+        }
 
         // calibrate off
 //        calibrate();
@@ -246,7 +280,9 @@ int main()
     // if not busy wait small time for next interrupt
     if(tnc[0].active_timeout == 0)
     {
+        HF_T_START;
         __wfi();
+        HF_T_END(6);
     }
 
 #ifdef BUSY_PIN

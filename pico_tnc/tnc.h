@@ -37,9 +37,20 @@
 
 // Added by Codex
 // Set to 1 to enable extra runtime diagnostics around RX/TNC handoff.
-// #ifndef CODEX_RX_DIAGNOSTICS
+#ifndef CODEX_RX_DIAGNOSTICS
 // #define CODEX_RX_DIAGNOSTICS 1
-// #endif
+#endif
+#if CODEX_RX_DIAGNOSTICS
+#include <stdint.h>
+extern uint32_t hf_diag_tmax[8];
+void codex_diag_clear_overruns(void);
+void codex_diag_rx_dropped(void);
+#define HF_T_START uint32_t hf_t0 = time_us_32()
+#define HF_T_END(i) do { uint32_t d = time_us_32() - hf_t0; if (d > hf_diag_tmax[i]) hf_diag_tmax[i] = d; } while (0)
+#else
+#define HF_T_START
+#define HF_T_END(i)
+#endif
 
 // Set to 1 to enable extra TNC EMULATION diagnostics.
 //#ifndef TNCEMUDEBUG
@@ -49,8 +60,8 @@
 // number of ports
 #define PORT_N 1    // number of ports, 1..3
 
-#define BAUD_RATE 1200
-#define SAMPLING_N 11
+#define BAUD_RATE 300      // HF packet: 300 baud
+#define SAMPLING_N 44      // 300 * 44 = 13200 Hz, same ADC rate as 1200 baud
 //#define DELAY_N 3
 //#define SAMPLING_RATE ((1000000*DELAY_N+DELAY_US/2)/DELAY_US)
 #define SAMPLING_RATE (BAUD_RATE * SAMPLING_N)
@@ -62,12 +73,14 @@
 #define DATA_LEN 1024                   // packet receive buffer size
 
 #define FIR_LPF_N 27
-#define FIR_BPF_N 25
+#define FIR_BPF_N 31
 
 #define ADC_BIT 8       // adc bits 8 or 12
 //#define ADC_BIT 12      // adc bits 8 or 12
 
 //#define BELL202_SYNC 1  // sync decode
+#define HF_TONE_DEMOD 1 // HF: compare mark/space tone energy (tolerates mistuning)
+#include "hf_demod.h"    // HF decoder settings
 #define DECODE_PLL 1    // use PLL
 #define OPEN_SQUELCH    // if using open squelch requires pll
 
@@ -173,6 +186,9 @@ typedef struct TNC {
     int high_idx;
     values_t values[SAMPLING_N];
     int values_idx;
+
+    // HF multi-decoder
+    hf_demod_t hf;
     filter_t lpf;
     filter_t bpf;
 

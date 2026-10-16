@@ -74,6 +74,16 @@ struct {
   unsigned int tx_sendpacket_fails;    // Added by Codex
   unsigned char last_sioa_cmd;         // Added by Codex
 } codex_diag = {0};
+
+void codex_diag_rx_dropped(void)
+{
+  codex_diag.rx_queue_dropped_full++;
+}
+
+void codex_diag_clear_overruns(void)
+{
+  codex_diag.adc_dma_overruns = 0;
+}
 #endif
 
 /* tnc emulator */
@@ -203,8 +213,8 @@ void tnc_init(void)
   static const filter_param_t flt_bpf = {
       .size = FIR_BPF_N,
       .sampling_freq = SAMPLING_RATE,
-      .pass_freq = 900,
-      .cutoff_freq = 2500,
+      .pass_freq = 1100,  // HF 1600/1800 Hz
+      .cutoff_freq = 2300,
   };
   bpf_an = filter_coeff(&flt_bpf);
 #if 0
@@ -237,6 +247,9 @@ void tnc_init(void)
       tp->state = FLAG;
       filter_init(&tp->lpf, lpf_an, FIR_LPF_N);
       filter_init(&tp->bpf, bpf_an, FIR_BPF_N);
+#ifdef HF_TONE_DEMOD
+      hf_demod_init(&tp->hf, SAMPLING_RATE, SAMPLING_N);
+#endif
 
       // send queue
       queue_init(&tp->send_queue, sizeof(uint8_t), SEND_QUEUE_LEN);
@@ -293,7 +306,11 @@ void tnc_emulate(void)
     printf("PC=%x cycles=%.0f\n",state.pc,total);
     cycles = Z80Emulate(&state, 1);
 #endif
-    cycles = Z80Emulate(&state, CYCLES_PER_PASS);
+    {
+      HF_T_START;
+      cycles = Z80Emulate(&state, CYCLES_PER_PASS);
+      HF_T_END(5);
+    }
     total += cycles;
     timer_int += cycles;
     sio_int += cycles;
@@ -847,7 +864,7 @@ int IO_in (int port)
       if(x == '&')
       {
         // Added by Codex
-        printf("\nCodex RX diag: in=%u drop=%u start=%u done=%u restart=%u qmax=%u pktmax=%u adcovr=%u txovr=%u\n",
+        watchdog_update(); printf("\nCodex RX diag: in=%u drop=%u start=%u done=%u restart=%u qmax=%u pktmax=%u adcovr=%u txovr=%u\n",
           codex_diag.rx_queue_inserted,
           codex_diag.rx_queue_dropped_full,
           codex_diag.rx_queue_started,
@@ -857,13 +874,40 @@ int IO_in (int port)
           codex_diag.rx_packet_max_len,
           codex_diag.adc_dma_overruns,
           codex_diag.tx_out_overflows);
-        printf(" rxbacklog=%u drainloops=%u drainmax=%u elong=%u emax=%u\n",
+        watchdog_update(); printf(" rxbacklog=%u drainloops=%u drainmax=%u elong=%u emax=%u\n",
           codex_diag.receive_backlog_max,
           codex_diag.receive_drain_loops,
           codex_diag.receive_drain_max,
           codex_diag.emulate_long_passes,
           codex_diag.emulate_max_cycles); // Added by Codex
 
+        {
+          extern unsigned int hf_diag_good, hf_diag_fcs_bad, hf_diag_short, hf_diag_bad_long;
+          extern volatile bool hf_diag_reset_pending;
+          extern int hf_diag_adc_min, hf_diag_adc_max;
+          watchdog_update(); printf("HF rx since last &: good=%u badfcs_long=%u adc_min=%d adc_max=%d (128 = center, 0/255 = clipping)\n",
+            hf_diag_good, hf_diag_bad_long, hf_diag_adc_min, hf_diag_adc_max);
+          watchdog_update();
+          printf("HF decoder hits (-90 -60 -30 0 +30 +60 +90 Hz):");
+          for (int i = 0; i < HF_DEC_N; i++) printf(" %u", tnc[0].hf.hits[i]);
+          printf("  copies dropped=%u\n", tnc[0].hf.dup);
+          {
+            extern int hf_diag_hz[12], hf_diag_hz_n;
+            watchdog_update(); printf("HF tone Hz per packet (avg of 1600/1800, ideal 1700, minus = failed checksum):");
+            for (int i = 0; i < hf_diag_hz_n; i++) printf(" %d", hf_diag_hz[i]);
+            watchdog_update(); printf("\n");
+          }
+          watchdog_update(); printf("HF adc overruns since last &: %u\n", codex_diag.adc_dma_overruns);
+          hf_diag_adc_min = 255;
+          hf_diag_adc_max = 0;
+          watchdog_update(); printf("HF max ms: gap=%lu rx=%lu emulate=%lu z80pass=%lu send=%lu serial=%lu wfi=%lu kiss=%lu\n",
+            hf_diag_tmax[0] / 1000, hf_diag_tmax[1] / 1000, hf_diag_tmax[2] / 1000, hf_diag_tmax[5] / 1000,
+            hf_diag_tmax[3] / 1000, hf_diag_tmax[4] / 1000, hf_diag_tmax[6] / 1000, hf_diag_tmax[7] / 1000);
+          hf_diag_reset_pending = true;  // cleared by main loop after this printout
+        }
+
+        watchdog_update();
+#if 0 // HF test: long printout trips the 1 s watchdog
         printf("\n Diagnostic Info:\n");
         printf("txunder=%d, feedflag=%d, Ax25OutCount=%d\n",txundr_count,feedflag,Ax25_Out_Cnt);
         printf("abotr=%d, busy=%d, sendState=%d, sendQfree=%d \n",abortflag,tnc[0].busy,tnc[0].send_state,send_queue_free(&tnc[0]));
@@ -896,7 +940,8 @@ int IO_in (int port)
           tnc[0].busy,
           tnc[0].send_state,
           send_queue_free(&tnc[0]),
-          queue_get_level(&tnc[0].dac_queue)); // Added by Codex                
+          queue_get_level(&tnc[0].dac_queue)); // Added by Codex
+#endif
       }
 #endif
       break;
