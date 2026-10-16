@@ -25,8 +25,11 @@
 #define PHASE_CYCLE 6
 #define PIO_DAC_FS (BIT_CYCLE * BAUD * 32)
 
+/* The tables live in RAM (not const) because the transmit DMA reads them
+   directly; reading flash while it is being written froze the chip. */
+
 /* sine table for delta sigma modulation, 1200Hz */
-static const uint32_t mark_tab[MARK_TAB_LEN] = {
+static uint32_t mark_tab[MARK_TAB_LEN] = {
 0x20000200, 0x00010000, 0x00040004, 0x10008002, 0x40080100, 0x04020100, 0x02040404, 0x82082081,
 0x84210420, 0x84442210, 0x44888888, 0x24491224, 0x4a492489, 0x94949492, 0x54a54a52, 0xaa9552a9,
 0xaaaaaaaa, 0xaad55aaa, 0xb5ad6ad5, 0xd6dadad6, 0xb6db6db6, 0xeddb76dd, 0x7777776e, 0x7bddeef7,
@@ -46,7 +49,7 @@ static const uint32_t mark_tab[MARK_TAB_LEN] = {
 };
 
 /* sine table for delta sigma modulation, 2200Hz */
-static const uint32_t space_tab[SPACE_TAB_LEN] = {
+static uint32_t space_tab[SPACE_TAB_LEN] = {
 0x10000200, 0x10002000, 0x20100200, 0x20404040, 0x44108208, 0x11111108, 0x24924489, 0xa9494949,
 0x5552aa54, 0x55aad555, 0x6dadad6b, 0xb76dbb6d, 0x77bbbbbb, 0xfbefbdef, 0xbfdfbf7e, 0xbffbff7f,
 0xf7fff7ff, 0xffffdfff, 0xffeffffe, 0xffbfffbf, 0xfdff7ff7, 0xfbf7f7fb, 0xef7bef7e, 0xbbbbbbbd,
