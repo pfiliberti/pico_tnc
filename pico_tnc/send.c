@@ -168,9 +168,14 @@ int send_byte(tnc_t *tp, uint8_t data, bool bit_stuff)
             // make Bell202 CPAFSK audio samples
             tp->dma_blocks[tp->next][idx++] = phase_tab[tp->level][tp->phase]; // 1: mark, 0: space
 
-            if (!tp->level) { // need adjust phase if space (2200Hz)
-                if (--tp->phase < 0) tp->phase = PHASE_CYCLE - 1;
+            // Maintain phase progression for 1600-Hz mark.
+	    // 1600 Hz completes 5 + 1/3 cycles per 300-baud bit.
+	    if (tp->level) {
+              tp->phase = (tp->phase + 2) % PHASE_CYCLE;
             }
+    //        if (!tp->level) { // need adjust phase if space (2200Hz)
+    //            if (--tp->phase < 0) tp->phase = PHASE_CYCLE - 1;
+    //        }
 
             // bit stuffing
             if (bit_stuff) {
