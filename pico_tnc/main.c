@@ -54,7 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // greeting message
 static const uint8_t greeting[] =
-    "\r\nPocket Pico (HF) Emulated Z80 TNC Ver 0.81\r\n";
+    "\r\nPocket Pico (HF) Emulated Z80 TNC Ver 0.82\r\n";
 
 // Watchdog Timer Reset Message
 static const uint8_t wdtfailmsg[] =
