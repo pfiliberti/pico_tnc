@@ -8,7 +8,7 @@ NOTICE: This HF Version is still experimental use at your own risk!
 ## PICO TNC features
 
 - Encode and decode Bell 202 AFSK signal without modem chip
-- Multiple Demodulators (7) spaced 30hz apart for better receive capture
+- Multiple Demodulators (7) spaced 50hz apart for better receive capture (stations up to about 180hz off tune)
 - Support USB Serial as well as 3.3v ttl serial interface
 - Emulated Support of full tnc and tnc commands including pbbs
 - Kiss support at the flip of a switch.

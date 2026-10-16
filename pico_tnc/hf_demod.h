@@ -2,7 +2,7 @@
  * hf_demod.h - 300 baud HF packet demodulator (1600/1800 Hz AFSK)
  *
  * Several decoders run side by side, each tuned a little differently
- * (like Direwolf's "7@30"), so a station that is off frequency still
+ * (like Direwolf's "7@30", but 50 Hz apart), so a station that is off frequency still
  * decodes. A frame that passes the checksum in any decoder is kept,
  * copies of it from the other decoders are dropped.
  */
@@ -17,7 +17,7 @@
 #ifndef HF_DEC_N
 #define HF_DEC_N 7              // number of decoders
 #endif
-#define HF_DEC_SPACING_HZ 30    // tuning step between decoders (7 x 30 Hz covers about +-100 Hz)
+#define HF_DEC_SPACING_HZ 50    // tuning step between decoders (7 x 50 Hz decodes stations up to about +-180 Hz off)
 #define HF_CORR_N 44            // correlation window: one bit at 13200 Hz sampling
 #define HF_HYST_SHIFT 5         // hysteresis = 1/32 of total tone energy
 #define HF_DATA_LEN 1024        // longest frame

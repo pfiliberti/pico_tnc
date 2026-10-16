@@ -898,8 +898,9 @@ int IO_in (int port)
           watchdog_update(); printf("HF rx since last &: good=%u badfcs_long=%u adc_min=%d adc_max=%d (128 = center, 0/255 = clipping)\n",
             hf_diag_good, hf_diag_bad_long, hf_diag_adc_min, hf_diag_adc_max);
           watchdog_update();
-          printf("HF decoder hits (-90 -60 -30 0 +30 +60 +90 Hz):");
-          for (int i = 0; i < HF_DEC_N; i++) printf(" %u", tnc[0].hf.hits[i]);
+          printf("HF decoder hits by offset:");
+          for (int i = 0; i < HF_DEC_N; i++)
+            printf(" %+dHz=%u", (i - HF_DEC_N / 2) * HF_DEC_SPACING_HZ, tnc[0].hf.hits[i]);
           printf("  copies dropped=%u\n", tnc[0].hf.dup);
           {
             extern int hf_diag_hz[12], hf_diag_hz_n;
