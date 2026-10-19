@@ -131,6 +131,27 @@ typedef struct {
 
 typedef struct TTY tty_t;
 
+// Extra receive slicers: the same discriminator output is sliced at
+// thresholds offset by +-1/4 and +-1/2 of its running level, which
+// recovers packets whose 1200 and 2200 Hz tones arrive at different
+// levels (FM pre/de-emphasis). The original slicer stays as is.
+#define RX_SLICERS 4
+#define RX_DUP_N 4          // remembered packets for the duplicate filter
+#define RX_DUP_TIME 50      // 500 ms
+
+typedef struct {
+    uint16_t data_cnt;
+    uint8_t data[DATA_LEN];
+    uint8_t state;
+    uint8_t flag;
+    uint8_t data_byte;
+    uint8_t data_bit_cnt;
+    int32_t pll_counter;
+    uint8_t bit;
+    uint8_t pval;
+    uint8_t nrzi;
+} slicer_t;
+
 typedef struct TNC {
     uint8_t port;
 
@@ -155,6 +176,14 @@ typedef struct TNC {
     int32_t pll_quality; // PLL lock confidence
     uint8_t pval;
     uint8_t nrzi;
+
+    // extra slicers and duplicate filter
+    slicer_t slicer[RX_SLICERS];
+    int32_t rx_level;
+    uint16_t dup_fcs[RX_DUP_N];
+    uint16_t dup_len[RX_DUP_N];
+    uint32_t dup_time[RX_DUP_N];
+    uint8_t dup_idx;
 
     // bell202_decode
     int delayed[DELAYED_N];
