@@ -281,7 +281,7 @@ void receive(void)
                 if (!rx_muted) {
                     // Added by Codex
                     // Reset receive state once on entry to TX so stale bits/flags do not survive.
-                    tp->state = FLAG;
+                    decode_reset(tp);
                     tp->cdt = false;
                     tp->cdt_lvl = 0;
                     gpio_put(tp->cdt_pin, 0);

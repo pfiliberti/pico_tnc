@@ -28,3 +28,4 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "tnc.h"
 
 void demodulator(tnc_t *tp, int adc);
+void decode_reset(tnc_t *tp);

@@ -106,17 +106,33 @@ static void display_packet(tty_t *ttyp, tnc_t *tp)
 #endif
 }
 
-static void output_packet(tnc_t *tp)
+// Several slicers usually decode the same packet; pass it on only once.
+static bool rx_duplicate(tnc_t *tp, uint8_t *data, int len)
 {
-    int len = tp->data_cnt;
-    uint8_t *data = tp->data;
+    uint16_t fcs = data[len - 2] | (data[len - 1] << 8);
+    uint32_t now = tnc_time();
 
-    if (len < MIN_LEN) return;
- 
+    for (int i = 0; i < RX_DUP_N; i++) {
+        if (tp->dup_len[i] == len && tp->dup_fcs[i] == fcs
+            && now - tp->dup_time[i] < RX_DUP_TIME) return true;
+    }
+    tp->dup_fcs[tp->dup_idx] = fcs;
+    tp->dup_len[tp->dup_idx] = len;
+    tp->dup_time[tp->dup_idx] = now;
+    if (++tp->dup_idx >= RX_DUP_N) tp->dup_idx = 0;
+    return false;
+}
+
+static bool rx_packet(tnc_t *tp, uint8_t *data, int len)
+{
+    if (len < MIN_LEN) return false;
+
     // FCS check
-    if (ax25_fcs(0, data, len) != FCS_OK) return;
+    if (ax25_fcs(0, data, len) != FCS_OK) return false;
     //printf("\n*** Pllq=%d,%d\n",tp->pll_quality,tp->flag_count);
- 
+
+    if (rx_duplicate(tp, data, len)) return false;
+
     // Here check if ax25 Input Queue has room and if so insert
     if(ax25_InQ_HasRoom()) ax25_InQ_Insert(data, len);
 #if CODEX_RX_DIAGNOSTICS
@@ -136,6 +152,12 @@ static void output_packet(tnc_t *tp)
         codex_diag.rx_queue_dropped_full++;
     }
 #endif
+    return true;
+}
+
+static void output_packet(tnc_t *tp)
+{
+    if (!rx_packet(tp, tp->data, tp->data_cnt)) return;
 
     for (int i = TTY_USB; i <= TTY_UART0; i++) {
         tty_t *ttyp = &tty[i];
@@ -287,6 +309,70 @@ static void decode2(tnc_t *tp, int val)
     }
 }
 
+// decode_bit() for an extra slicer
+static void slicer_bit(tnc_t *tp, slicer_t *sp, int bit)
+{
+    sp->flag <<= 1;
+    sp->flag |= bit;
+
+    switch (sp->state)
+    {
+        case FLAG:
+        if (sp->flag == AX25_FLAG) {
+            sp->state = DATA;
+            sp->data_cnt = 0;
+            sp->data_bit_cnt = 0;
+        }
+        break;
+
+        case DATA:
+        if ((sp->flag & 0x3f) == 0x3f) { // end of packet
+            rx_packet(tp, sp->data, sp->data_cnt);
+            sp->state = FLAG;
+            break;
+        }
+
+        if ((sp->flag & 0x3f) == 0x3e) break; // ignore bit stuffing bit
+
+        sp->data_byte >>= 1;
+        sp->data_byte |= (bit << 7);
+
+        if (++sp->data_bit_cnt >= 8) {
+            if (sp->data_cnt < DATA_LEN) {
+                sp->data[sp->data_cnt++] = sp->data_byte;
+            } else { // packet too long
+                sp->state = FLAG;
+                break;
+            }
+            sp->data_bit_cnt = 0;
+        }
+    }
+}
+
+// decode2() PLL for an extra slicer (carrier detect stays on the main slicer)
+static void slicer_pll(tnc_t *tp, slicer_t *sp, int val)
+{
+    int32_t prev_pll = sp->pll_counter >> 31;
+
+    sp->pll_counter += PLL_STEP;
+
+    if ((sp->pll_counter >> 31) < prev_pll) { // overflow
+        slicer_bit(tp, sp, val == sp->nrzi);
+        sp->nrzi = val;
+    }
+
+    if (val != sp->pval) {
+        sp->pll_counter -= sp->pll_counter >> 2; // same phase correction as decode2()
+        sp->pval = val;
+    }
+}
+
+void decode_reset(tnc_t *tp)
+{
+    tp->state = FLAG;
+    for (int i = 0; i < RX_SLICERS; i++) tp->slicer[i].state = FLAG;
+}
+
 void demodulator(tnc_t *tp, int adc)
 {
     int val;
@@ -324,7 +410,7 @@ void demodulator(tnc_t *tp, int adc)
     // If no signal energy revert receiver state to FLAG and cdt=false
     if (tp->cdt && tp->cdt_lvl < CDT_THR_LOW)
     {
-        tp->state = FLAG;
+        decode_reset(tp);
         tp->cdt = false;
         gpio_put(tp->cdt_pin, 0);
     }
@@ -405,4 +491,15 @@ void demodulator(tnc_t *tp, int adc)
 #else
 	decode(tp, tp->bit);    // bit length
 #endif
+
+    // extra slicers at -1/2, -1/4, +1/4, +1/2 of the running level
+    int a = val < 0 ? -val : val;
+    tp->rx_level += (a - tp->rx_level) >> 8;
+    int32_t th[RX_SLICERS] = { -(tp->rx_level >> 1), -(tp->rx_level >> 2),
+                                tp->rx_level >> 2, tp->rx_level >> 1 };
+    for (int i = 0; i < RX_SLICERS; i++) {
+        slicer_t *sp = &tp->slicer[i];
+        sp->bit = val < th[i];
+        slicer_pll(tp, sp, sp->bit);
+    }
 }
