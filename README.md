@@ -6,7 +6,7 @@ PICO TNC aka (Pocket Pico) is the Terminal Node Controler for Amateur Packet Rad
 ## PICO TNC features
 
 - Encode and decode Bell 202 AFSK signal without modem chip
-- Encode and decode of 1600/1300 AFSK for HF Packet (See Branch Pocketpicohf)
+- Encode and decode of 1600/1800 AFSK for HF Packet (See Branch Pocketpicohf)
 - Support USB Serial as well as 3.3v ttl serial interface
 - Emulated Support of full tnc and tnc commands including pbbs
 - Kiss support at the flip of a switch.
