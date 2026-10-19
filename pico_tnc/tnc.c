@@ -133,6 +133,15 @@ void tnc_init(void)
 //  Rom[0x5032] = Rom[0x5041];
   Rom[0x5032] = 0x3e;
 
+    /* patch to always load 0 from TXDELAY */
+    /* code at 0x4bfe in Rom reads from TXDELAY */
+    /* 4bfe ld a,(0bfdbh) 3a db bf */
+    /* replace with nop xora inc a 00 af 3c*/
+
+    Rom[0x4bfe] = 0; /* plant nop */
+    Rom[0x4bff] = 0xaf; /* plant xor a */
+    Rom[0x4c00] = 0x3c; /* plant inc a */
+
   /* Stuff NOPs to disable strange obfuscation of text */
   for(int x=0; x< 11; x++) Rom[0x47f7+x] = 0;
   Rom[0x47f7+12] = 0;
