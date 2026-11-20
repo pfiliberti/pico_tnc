@@ -1,0 +1,11 @@
+Version 0.84
+   *Faster handling of received packets. Received data now 
+    reaches the TNC about twice as fast, so acks, digipeats and PBBS 
+    replies go out sooner, especially after long frames. In testing, acks 
+    after 128-byte frames came about 0.75 seconds sooner.
+
+   *Less wasted work when idle. The TNC no longer gets “transmit buffer 
+   empty” interrupts while it isn’t transmitting.
+
+   *No settings change, and saved settings and PBBS messages carry over 
+   when you update.
