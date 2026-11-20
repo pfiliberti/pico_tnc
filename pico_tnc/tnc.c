@@ -669,7 +669,7 @@ void tnc_emulate(void)
 //      }
         tp->active_timeout = DEFAULT_ACTIVITY_COUNT;
       } 
-      else 
+      else if(oldptt == 2) /* only do tx empty ints when transmitting! oldptt is current ptt */
       {
         // Added by Codex
         unsigned int codex_wait_loops = 0;
