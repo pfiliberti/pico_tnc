@@ -499,7 +499,10 @@ void tnc_emulate(void)
   //   }
     flop = flop ^0x01;
     sio_int = 0;
-    if(flop)
+
+    // If flop slot or if we don't need to work flip slot then process flop
+    // timeslot functions.
+    if(flop || (oldptt != 2 && !consolePeek() && (RxCharIn_Idx || ax25rdy)))
     {
 
       if(RxCharIn_Idx || ax25rdy)
