@@ -24,6 +24,7 @@
 #define OPEN_TNC_PTT_OUT	16	// physical pin 21
 
 //	OpenTNC Leds are (Left to Right): RUN, CONNECT, CARRIER, PACKET, PTT
+#define OPEN_TNC_RUN            10      // physical pin 14
 #define OPEN_TNC_CARRIER	11	// physical pin 15
 #define OPEN_TNC_CONNECT	12	// physical pin 16
 #define OPEN_TNC_STATION	13	// physical pin 17
@@ -207,15 +208,18 @@ typedef struct TNC {
 #define DIP_SWITCH_0 OPEN_TNC_SW0
 #define DIP_SWITCH_1 OPEN_TNC_SW1
 #define DIP_SWITCH_2 OPEN_TNC_SW2
+#define TNC_EMULATING_LED_PIN OPEN_TNC_RUN
+#define CON_LED_GPIO OPEN_TNC_CONNECT /* IO for Console LED */
+#define STA_LED_GPIO OPEN_TNC_STATION /* IO for Station LED */
 #else
 #define DIP_SWITCH_0 16
 #define DIP_SWITCH_1 17
 #define DIP_SWITCH_2 18
-#endif
-
 #define CON_LED_GPIO 14 /* IO for Console LED */
 #define STA_LED_GPIO 15 /* IO for Station LED */
 #define TNC_EMULATING_LED_PIN PICO_DEFAULT_LED_PIN
+#endif
+
 
 #define DEFAULT_ACTIVITY_COUNT 1000
 
