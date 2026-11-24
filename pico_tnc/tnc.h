@@ -17,7 +17,7 @@
 // NOTE make sure this file (tnc.h) is included in send.c and receive.c
 //	send.c and receive.c will use presence of the following definitions only
 //	that way a simple command line -D OPEN_TNC_GPIO wil enable them in all files
-#define OPEN_TNC_GPIO	1
+//#define OPEN_TNC_GPIO	1
 #ifdef OPEN_TNC_GPIO
 //	GPIO Number definitions for OpenTNC hardware
 #define OPEN_TNC_PWM		20	// physical pin 26
